@@ -64,6 +64,6 @@ migrate.copyAssetTree(sourceRoot,destinationRoot,changeDestinationPermissions,de
 # !!!!!!!!!!!! DANGER !!!!!!!!!!!!
 # !!!!!!!!!!!! DANGER !!!!!!!!!!!!
 #Delete folder tree if you would like to clean up any asset trees
-#deleteAssetTree(sourceRoot)
+#migrate.deleteAssetTree(sourceRoot)
 
         
