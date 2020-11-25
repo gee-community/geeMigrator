@@ -1,8 +1,8 @@
-import ee,os,json,re,shutil,ctypes
+import ee,os,json,re,shutil,ctypes,glob,secrets
 from google.oauth2.credentials import Credentials
 ###################################################################################################
 """
-   Copyright 2019 Ian Housman and Leah Campbell
+   Copyright 2020 Ian Housman and Leah Campbell
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ from google.oauth2.credentials import Credentials
    limitations under the License.
 """
 ###################################################################################################
+#Library of functions for recursively migrating Google Earth Engine assets from one repository to a new one, sets permissions, and deletes old assets if needed.
 ###################################################################################################
 def check_end(in_path, add = '/'):
     if in_path[-len(add):] != add:
@@ -31,7 +32,7 @@ def check_end(in_path, add = '/'):
 def custom_authenticate(token_path_name,initialize = True,overwrite = False):
     token_path_name = os.path.normpath(token_path_name)
     #Ensure token directory exists
-    if os.path.exists(os.path.dirname(token_path_name)) == False:os.makedirs(custom_token_dir)
+    if os.path.exists(os.path.dirname(token_path_name)) == False:os.makedirs(os.path.dirname(token_path_name))
 
     #If the token doesn't already exist or overwrite == True, create it
     if os.path.exists(token_path_name) == False or overwrite:
@@ -84,29 +85,63 @@ def initializeFromToken(token_path_name):
           scopes=ee.oauth.SCOPES)
     ee.Initialize(c)
 ###################################################################################################
+def setupToken(token_dir,root,overwrite = False,name = ''):
+    token_dir = check_end(token_dir)
+    root = fixAssetPath(root)
+    token = token_dir+'credentials_'+secrets.token_urlsafe(32) # '_'.join(root.split('/'))
+        
+    if os.path.exists(token) == False or overwrite:
+        a = ctypes.windll.user32.MessageBoxW(0, 'Please authenticate to the account that has access to the "{}" asset folder.\n\nMake sure you select the account that has owner level permissions for the asset folder you are copying from.\n\nSometimes the authentication URL will open in a browser instance that does not immediately list the account. You can copy and paste the URL into another browser instance if needed.\n\nThe token will be stored as "{}"'.format(root,token), "!!!! IMPORTANT !!!! Set up {}token".format(name+ ' '), 1)
+        if a == 1:
+            custom_authenticate(token,initialize = False,overwrite = overwrite)
+            addRoots(token)
+    return token
+###################################################################################################
+#Function to set up credentials that have access to a specified asset root folder
+#This function will run until it can find a token that has the root listed under the available assetRoots
+def smartGetCredentials(root, token_dir = os.path.dirname(ee.oauth.get_credentials_path()),overwrite = False,name = ''):
+    #House keeping
+    if os.path.exists(token_dir) == False:os.makedirs(token_dir)
+    token_dir = check_end(token_dir)
+    root = fixAssetPath(root)
+    
+    #Try to find a token with asset roots
+    #Asset roots will be added to token json if they are not already there 
+    out_token = None
+    iteration = 1
+    while out_token == None:
+        #List available tokens (assumes only token files are in token_dir)
+        os.chdir(token_dir)
+        tokens = glob.glob('*')
+
+        #Find tokens that contain the root as an available asset root
+        for token in tokens:
+            o = json.load(open(token))
+            if 'roots' not in o.keys():
+                addRoots(token)
+                o = json.load(open(token))
+            roots = [token_dir + i for i in o['roots'] if root.find(i) > -1]
+            if roots != []:
+                out_token = token_dir + token
+
+        #If no available tokens have access to the root, set up a new one
+        if out_token == None:
+            if iteration > 1:
+                ctypes.windll.user32.MessageBoxW(0, 'The account you just authenticated to does not have access to {}. Please retry and ensure you select an account that does have access to {}.'.format(root,root), "!!!! IMPORTANT !!!! Set up {}token failed. RETRY!".format(name+ ' '), 1)
+        
+            setupToken(token_dir,root,overwrite = overwrite,name = name)
+            iteration += 1
+
+    # ctypes.windll.user32.MessageBoxW(0, 'Successfully found token that has access to {}'.format(root), "!!!! SUCCESS !!!!", 1)
+    print('Successfully found token that has access to {}'.format(root))
+    return out_token
+###################################################################################################
 #Function to get credentials set up for two accounts for asset migration
 def setupCredentialsForMigration(token_dir,sourceRoot,destinationRoot,overwrite = False):
-    #Set up token paths
-    sourceRoot = fixAssetPath(sourceRoot)
-    destinationRoot = fixAssetPath(destinationRoot)
-
-    token_dir = check_end(token_dir)
-    source_token = token_dir+'_'.join(sourceRoot.split('/'))
-    destination_token = token_dir+'_'.join(destinationRoot.split('/'))
-    
-    #Get source token
-    if os.path.exists(source_token) == False or overwrite:
-        a = ctypes.windll.user32.MessageBoxW(0, 'First, you will authenticate to the account that has access to the "{}" asset folder you are copying from\n\nMake sure you select the account that has owner level permissions for the asset folder you are copying from.\n\nSometimes the authentication URL will open in a browser instance that does not immediately list the account. You can copy and paste the URL into another browser instance if needed.\n\nThe token will be stored as "{}"'.format(sourceRoot,source_token), "!!!! IMPORTANT !!!!", 1)
-        if a == 1:
-            custom_authenticate(source_token,initialize = False,overwrite = overwrite)
-            addRoots(source_token)
-    #Get destination token
-    if os.path.exists(destination_token) == False or overwrite:
-        a = ctypes.windll.user32.MessageBoxW(0, 'Next, you will authenticate to the account that has access to the "{}" asset folder you are copying from\n\nMake sure you select the account that has owner level permissions for the asset folder you are copying from.\n\nSometimes the authentication URL will open in a browser instance that does not immediately list the account. You can copy and paste the URL into another browser instance if needed.\n\nThe token will be stored as "{}"'.format(destinationRoot,destination_token), "!!!! IMPORTANT !!!!", 1)
-        if a == 1:
-            custom_authenticate(destination_token,initialize = False,overwrite = overwrite)
-            addRoots(destination_token)
-    return source_token,destination_token
+    #Get tokens
+    source_token = smartGetCredentials(sourceRoot, token_dir,overwrite = overwrite,name = 'Source')
+    destination_token = smartGetCredentials(destinationRoot, token_dir,overwrite = overwrite,name = 'Destination')
+    return source_token, destination_token
 # ###################################################################################################
 def fixAssetPath(path,legacy_prefix = 'projects/earthengine-legacy/assets/',regex = "^projects/[^/]+/assets/.*$"):
     if re.match(regex,path) == None:
@@ -123,7 +158,11 @@ def getTree(fromRoot,toRoot,treeList = None):
 
     #Initialize treeList with original root directories if None
     if treeList == None: 
-        rootType = ee.data.getAsset(fromRoot)['type']
+        try:
+            rootType = ee.data.getAsset(fromRoot)['type']
+        except:
+            rootType = 'FOLDER'
+
         treeList = [[rootType,fromRoot,toRoot]]
 
     #Clean up the given paths
@@ -169,14 +208,15 @@ def batchChangePermissions(assetList = None,root = None,readers = [],writers = [
 #Function to copy all folders, imageCollections, images, and tables under a given folder or imageCollection level
 #Permissions can also be set here 
 def copyAssetTree(fromRoot,toRoot,changePermissions = False,readers = [],writers = [],all_users_can_read = False):
+    print('Getting asset tree list')
     treeList = getTree(fromRoot,toRoot)
-    
+  
     #Iterate across all assets and copy and create when appropriate
     for fromType,fromID,toID in treeList:
         if fromType in ['FOLDER','IMAGE_COLLECTION']:
             try:
                 print('Creating {}: {}'.format(fromType,toID))
-                ee.data.createAsset({'type':'Image_Collection', 'name': toID})
+                ee.data.createAsset({'type':fromType, 'name': toID})
             except Exception as e:
                 print(e)
         else:
@@ -190,7 +230,7 @@ def copyAssetTree(fromRoot,toRoot,changePermissions = False,readers = [],writers
         print()
 
     if changePermissions:
-        batchChangePermissions(assetList = [i[2] for i in treeList],root = None,readers = [],writers = [], all_users_can_read = False)
+        batchChangePermissions(assetList = [i[2] for i in treeList],root = None,readers = readers,writers = writers, all_users_can_read = all_users_can_read)
 ###################################################################################################
 #Function to delete all folders, imageCollections, images, and tables under a given folder or imageCollection level
 def deleteAssetTree(root):
