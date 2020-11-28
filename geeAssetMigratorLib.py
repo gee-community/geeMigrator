@@ -85,7 +85,9 @@ def initializeFromToken(token_path_name):
           scopes=ee.oauth.SCOPES)
     ee.Initialize(c)
 ###################################################################################################
+#Function to set up a new token and check if it works for specified root
 def setupToken(token_dir,root,overwrite = False,name = ''):
+    if not token_dir:token_dir = os.path.dirname(ee.oauth.get_credentials_path())
     token_dir = check_end(token_dir)
     root = fixAssetPath(root)
     token = token_dir+'credentials_'+secrets.token_urlsafe(32) # '_'.join(root.split('/'))
@@ -100,6 +102,7 @@ def setupToken(token_dir,root,overwrite = False,name = ''):
 #Function to set up credentials that have access to a specified asset root folder
 #This function will run until it can find a token that has the root listed under the available assetRoots
 def smartGetCredentials(root, token_dir = os.path.dirname(ee.oauth.get_credentials_path()),overwrite = False,name = ''):
+    if not token_dir:token_dir = os.path.dirname(ee.oauth.get_credentials_path())
     #House keeping
     if os.path.exists(token_dir) == False:os.makedirs(token_dir)
     token_dir = check_end(token_dir)
@@ -107,34 +110,71 @@ def smartGetCredentials(root, token_dir = os.path.dirname(ee.oauth.get_credentia
     
     #Try to find a token with asset roots
     #Asset roots will be added to token json if they are not already there 
-    out_token = None
+    can_write = False
     iteration = 1
-    while out_token == None:
+    while not can_write:
         #List available tokens (assumes only token files are in token_dir)
         os.chdir(token_dir)
         tokens = glob.glob('*')
 
         #Find tokens that contain the root as an available asset root
         for token in tokens:
-            o = json.load(open(token))
-            if 'roots' not in o.keys():
-                addRoots(token)
-                o = json.load(open(token))
-            roots = [token_dir + i for i in o['roots'] if root.find(i) > -1]
-            if roots != []:
-                out_token = token_dir + token
-
+            can_write = canWrite(token,root)
+          
+            if can_write:
+                out_token = token
+                break
         #If no available tokens have access to the root, set up a new one
-        if out_token == None:
+        if not can_write:
             if iteration > 1:
                 ctypes.windll.user32.MessageBoxW(0, 'The account you just authenticated to does not have access to {}. Please retry and ensure you select an account that does have access to {}.'.format(root,root), "!!!! IMPORTANT !!!! Set up {}token failed. RETRY!".format(name+ ' '), 1)
         
-            setupToken(token_dir,root,overwrite = overwrite,name = name)
+            out_token = setupToken(token_dir,root,overwrite = overwrite,name = name)
             iteration += 1
 
     # ctypes.windll.user32.MessageBoxW(0, 'Successfully found token that has access to {}'.format(root), "!!!! SUCCESS !!!!", 1)
     print('Successfully found token that has access to {}'.format(root))
     return out_token
+##################################################################################################
+#Get root dir of an asset
+def getAssetRoot(asset):
+    return re.search("^projects/[^/]+/assets/", asset).group(0)
+###################################################################################################
+#See if a given token path can access a specified asset root
+def canWrite(token,root):
+
+    #House keeping
+    root = check_end(root)
+    root = fixAssetPath(root)
+    
+    #See if there are stored roots in json
+    can_write = False
+    token_dict = json.load(open(token))
+    print('roots' not in token_dict.keys())
+
+    #First try to add the owner roots and see if that is listed
+    if 'roots' not in token_dict.keys():
+        addRoots(token)
+        token_dict = json.load(open(token))
+    root_matches = [i for i in token_dict['roots'] if root.find(i) == 0]
+    if root_matches != []:can_write = True
+
+    #If root is still not listed for token, try seeing if the asset root quota can be acquired
+    if not can_write:
+        try:
+            initializeFromToken(token)
+            quota = ee.data.getAssetRootQuota(getAssetRoot(root))
+            can_write = True
+            
+            #Cache it if it has access
+            token_dict['roots'].append(root)
+            o = open(token,'w')
+            o.write(json.dumps(token_dict))
+            o.close()
+        except Exception as e:
+            print('Token {} cannot access {}'.format(token,root))
+            
+    return can_write
 ###################################################################################################
 #Function to get credentials set up for two accounts for asset migration
 def setupCredentialsForMigration(token_dir,sourceRoot,destinationRoot,overwrite = False):
