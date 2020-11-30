@@ -6,8 +6,12 @@
   * Setting access-control list (ACL) permissions (who can read and write to a given asset folder/imageCollection)
 
 ## Primary POCs
-* Ian Housman- ian.housman@usda.gov
-* Leah Campbell- leah.campbell@usda.gov
+* Primary setup contact (contact for any issues with setting up the migration example and running it):
+  * Josh Heyer- joshua.heyer@usda.gov
+  
+* Primary authors (contact if any major bugs are found or feature requests):
+  * Ian Housman- ian.housman@usda.gov
+  * Leah Campbell- leah.campbell@usda.gov
 
 ## Dependencies
 * Python 3
