@@ -48,4 +48,4 @@
     
     * DANGER!!!! Optional method to use is `deleteAssetTree`. This method will delete all assets under the specified asset level. This cannot be undone, but is useful for cleaning up any asset tree.
       * E.g. if `migrate.deleteAssetTree('users/fromUsername/someFolder')` is specified, all folders, imageCollections, images, and tables under `users/fromUsername/someFolder` will be deleted.
-  * Run script 
+  * Run `geeAssetMigratorExample.py` script 
