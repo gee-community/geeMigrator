@@ -3,7 +3,7 @@
 * Recursively migrates all assets under a user-specified asset to another user-specified asset
 * Handles migrating between two different accounts and:
   * Authentication to different accounts
-  * Setting ACL permissions 
+  * Setting access control-list (ACL) permissions (who can read and write to a given asset folder/imageCollection)
 
 ## Primary POCs
 * Ian Housman- ian.housman@usda.gov
@@ -31,7 +31,7 @@
       * E.g. if you would like to migrate all assets under a personal user account: `sourceRoot = 'users/fromUsername' and destinationRoot = 'users/toUsername'`
       * E.g. if you would like to migrate some assets under a personal user account: `sourceRoot = 'users/fromUsername/someFolder' and destinationRoot = 'users/toUsername/someFolder'`
       * E.g. if you would like to migrate some assets under a legacy project to a GCP project: `sourceRoot = 'projects/someProject/someFolder' and destinationRoot = 'projects/someGCPProject/someFolder'`
-    * The ACL permissions. Source assets and destination assets can have their permissions updated. This is essential if the destination assets fall under a different account than the source assets. If this is the case, you must add the user, group, service account, or project as a writer to the source assets by listing it under the `sourceWriters` list.
+    * Updating the ACL permissions (who can read or write to a given asset folder or imageCollection). Source assets and destination assets can have their permissions updated. This is essential if the destination assets fall under a different account than the source assets. If this is the case, you must add the user, group, service account, or project as a writer to the source assets by listing it under the `sourceWriters` list.
       
       * E.g. `sourceWriters = ['user:destinationEmail@domain.com']`
   * The basic workflow within the script is:
