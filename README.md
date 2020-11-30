@@ -35,8 +35,9 @@
       
       * E.g. `sourceWriters = ['user:destinationEmail@domain.com']`
   * The basic workflow within the script is:
-    * `setupCredentialsForMigration` - Ensure tokens are available that have the `sourceRoot` and `destinationRoot` in their accessible root folders
+    * `setupCredentialsForMigration` - Ensure tokens are available that have access to both the `sourceRoot` and `destinationRoot`
       * Tokens will be created if they do not exist by prompting the user to log into the appropriate account
+      * The ee.Authenticate method will be used. This opens a login screen in your browser. You must log into the account that has access to the appropriate root folder, copy the token into the command prompt and press ENTER.
       * This process will run until a token can be found that has access to both the `sourceRoot` and `destinationRoot`. If this requires different tokens, it will automatically be handled.
     * `batchChangePermissions` - Add the destination account listed under `sourceWriters` to all assets under the `sourceRoot`
     * `copyAssetTree` - Copy all assets under the `sourceRoot` to the `destinationRoot` and update destination assets ACLs if specified under `changeDestinationPermissions`
