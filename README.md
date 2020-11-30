@@ -3,7 +3,7 @@
 * Recursively migrates all assets under a user-specified asset to another user-specified asset
 * Handles migrating between two different accounts and:
   * Authentication to different accounts
-  * Setting access control-list (ACL) permissions (who can read and write to a given asset folder/imageCollection)
+  * Setting access-control list (ACL) permissions (who can read and write to a given asset folder/imageCollection)
 
 ## Primary POCs
 * Ian Housman- ian.housman@usda.gov
